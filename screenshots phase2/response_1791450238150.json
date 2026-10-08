@@ -1,0 +1,32 @@
+[
+  {
+    "id": 2,
+    "title": "string",
+    "description": "string",
+    "category": "Music",
+    "location": "string",
+    "event_date": "2026-10-08T06:21:28.707000",
+    "ticket_price": 0,
+    "banner_image": "string",
+    "total_tickets": 1,
+    "available_tickets": 1,
+    "organizer_id": 2,
+    "event_status": "CANCELLED",
+    "created_at": "2026-10-08T06:19:03"
+  },
+  {
+    "id": 3,
+    "title": "string",
+    "description": "string",
+    "category": "Music",
+    "location": "string",
+    "event_date": "2026-10-08T09:02:40.897000",
+    "ticket_price": 0,
+    "banner_image": "string",
+    "total_tickets": 3,
+    "available_tickets": 3,
+    "organizer_id": 2,
+    "event_status": "ONGOING",
+    "created_at": "2026-10-08T09:02:50"
+  }
+]

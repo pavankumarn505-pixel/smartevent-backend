@@ -1,0 +1,9 @@
+{
+  "id": 5,
+  "user_id": 2,
+  "event_id": 1,
+  "ticket_quantity": 4,
+  "total_price": 2000,
+  "booking_status": "CONFIRMED",
+  "created_at": "2026-10-08T07:10:06"
+}

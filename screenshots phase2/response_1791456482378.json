@@ -1,0 +1,14 @@
+{
+  "admin": {
+    "id": 4,
+    "username": "admin",
+    "role": "ADMIN"
+  },
+  "platform_statistics": {
+    "total_users": 4,
+    "total_events": 3,
+    "total_bookings": 6,
+    "total_tickets_sold": 5,
+    "total_revenue": 9000
+  }
+}

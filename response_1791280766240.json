@@ -1,0 +1,9 @@
+[
+  {
+    "id": 1,
+    "booking_id": 2,
+    "ticket_code": "TKT-5F9A40FB4DC2",
+    "qr_code_url": "/qr_codes/TKT-5F9A40FB4DC2.png",
+    "created_at": "2026-10-06T09:58:59"
+  }
+]

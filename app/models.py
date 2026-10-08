@@ -1,0 +1,341 @@
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Text,
+    DateTime,
+    Float,
+    ForeignKey,
+    Boolean
+)
+
+from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
+
+from .database import Base
+
+
+# =========================================================
+# USER MODEL
+# =========================================================
+
+class User(Base):
+
+    __tablename__ = "users"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    username = Column(
+        String(100),
+        unique=True,
+        nullable=False
+    )
+
+    email = Column(
+        String(255),
+        unique=True,
+        nullable=False
+    )
+
+    hashed_password = Column(
+        String(255),
+        nullable=False
+    )
+
+    # =====================================================
+    # ROLE
+    # USER / ORGANIZER / ADMIN
+    # =====================================================
+
+    role = Column(
+        String(20),
+        nullable=False,
+        default="USER"
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now()
+    )
+
+    # Relationships
+
+    bookings = relationship(
+        "Booking",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+
+    notifications = relationship(
+        "Notification",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+
+    organized_events = relationship(
+        "Event",
+        back_populates="organizer"
+    )
+
+
+# =========================================================
+# EVENT MODEL
+# =========================================================
+
+class Event(Base):
+
+    __tablename__ = "events"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    title = Column(
+        String(200),
+        nullable=False
+    )
+
+    description = Column(
+        Text,
+        nullable=True
+    )
+
+    category = Column(
+        String(50),
+        nullable=False
+    )
+
+    location = Column(
+        String(255),
+        nullable=False
+    )
+
+    event_date = Column(
+        DateTime,
+        nullable=False
+    )
+
+    ticket_price = Column(
+        Float,
+        nullable=False
+    )
+
+    banner_image = Column(
+        String(500),
+        nullable=True
+    )
+
+    total_tickets = Column(
+        Integer,
+        nullable=False
+    )
+
+    available_tickets = Column(
+        Integer,
+        nullable=False
+    )
+
+    # =====================================================
+    # ORGANIZER
+    # =====================================================
+
+    organizer_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=True
+    )
+
+    # =====================================================
+    # EVENT STATUS
+    # UPCOMING / ONGOING / COMPLETED / CANCELLED
+    # =====================================================
+
+    event_status = Column(
+        String(20),
+        nullable=False,
+        default="UPCOMING"
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now()
+    )
+
+    # Relationships
+
+    bookings = relationship(
+        "Booking",
+        back_populates="event",
+        cascade="all, delete-orphan"
+    )
+
+    organizer = relationship(
+        "User",
+        back_populates="organized_events"
+    )
+
+
+# =========================================================
+# BOOKING MODEL
+# =========================================================
+
+class Booking(Base):
+
+    __tablename__ = "bookings"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False
+    )
+
+    event_id = Column(
+        Integer,
+        ForeignKey("events.id"),
+        nullable=False
+    )
+
+    ticket_quantity = Column(
+        Integer,
+        nullable=False
+    )
+
+    total_price = Column(
+        Float,
+        nullable=False
+    )
+
+    booking_status = Column(
+        String(20),
+        nullable=False,
+        default="PENDING"
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now()
+    )
+
+    user = relationship(
+        "User",
+        back_populates="bookings"
+    )
+
+    event = relationship(
+        "Event",
+        back_populates="bookings"
+    )
+
+    ticket = relationship(
+        "Ticket",
+        back_populates="booking",
+        uselist=False,
+        cascade="all, delete-orphan"
+    )
+
+
+# =========================================================
+# TICKET MODEL
+# =========================================================
+
+class Ticket(Base):
+
+    __tablename__ = "tickets"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    booking_id = Column(
+        Integer,
+        ForeignKey("bookings.id"),
+        unique=True,
+        nullable=False
+    )
+
+    ticket_code = Column(
+        String(100),
+        unique=True,
+        nullable=False
+    )
+
+    qr_code_url = Column(
+        String(500),
+        nullable=True
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now()
+    )
+
+    booking = relationship(
+        "Booking",
+        back_populates="ticket"
+    )
+
+
+# =========================================================
+# NOTIFICATION MODEL
+# =========================================================
+
+class Notification(Base):
+
+    __tablename__ = "notifications"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False
+    )
+
+    title = Column(
+        String(255),
+        nullable=False
+    )
+
+    message = Column(
+        Text,
+        nullable=False
+    )
+
+    type = Column(
+        String(20),
+        nullable=False
+    )
+
+    is_read = Column(
+        Boolean,
+        nullable=False,
+        default=False
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now()
+    )
+
+    user = relationship(
+        "User",
+        back_populates="notifications"
+    )

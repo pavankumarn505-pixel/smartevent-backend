@@ -1,0 +1,10 @@
+{
+  "event_id": 2,
+  "event_title": "string",
+  "event_status": "CANCELLED",
+  "total_tickets": 1,
+  "tickets_sold": 0,
+  "remaining_tickets": 1,
+  "booking_count": 0,
+  "total_revenue": 0
+}

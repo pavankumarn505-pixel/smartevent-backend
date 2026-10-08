@@ -1,0 +1,51 @@
+{
+  "filters": {
+    "start_date": null,
+    "end_date": null
+  },
+  "summary": {
+    "total_bookings": 6,
+    "total_tickets_sold": 18,
+    "total_revenue": 9000
+  },
+  "daily_ticket_sales": [
+    {
+      "date": "2026-10-06",
+      "tickets_sold": 10,
+      "bookings": 4,
+      "revenue": 5000
+    },
+    {
+      "date": "2026-10-08",
+      "tickets_sold": 8,
+      "bookings": 2,
+      "revenue": 4000
+    }
+  ],
+  "monthly_booking_trends": [
+    {
+      "month": "2026-10",
+      "bookings": 6,
+      "tickets_sold": 18,
+      "revenue": 9000
+    }
+  ],
+  "most_popular_events": [
+    {
+      "event_id": 1,
+      "tickets_sold": 18,
+      "bookings": 6,
+      "revenue": 9000,
+      "event_title": "Bangalore Tech Conference"
+    }
+  ],
+  "top_revenue_events": [
+    {
+      "event_id": 1,
+      "tickets_sold": 18,
+      "bookings": 6,
+      "revenue": 9000,
+      "event_title": "Bangalore Tech Conference"
+    }
+  ]
+}

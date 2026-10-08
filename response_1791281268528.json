@@ -1,0 +1,11 @@
+[
+  {
+    "id": 1,
+    "user_id": 2,
+    "title": "Booking Confirmed",
+    "message": "Your booking for 'Bangalore Tech Conference' has been confirmed. You booked 3 ticket(s).",
+    "type": "BOOKING",
+    "is_read": false,
+    "created_at": "2026-10-06T10:07:23"
+  }
+]
