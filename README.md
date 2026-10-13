@@ -363,3 +363,4 @@ The project is structured to support these features. Actual implementation and t
 ## Author
 
 Developed as a full-stack event discovery and ticket-booking project using Python, FastAPI, SQLAlchemy, JWT authentication, and Stripe integration.
+
