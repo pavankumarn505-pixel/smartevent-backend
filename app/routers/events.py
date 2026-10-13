@@ -1,3 +1,4 @@
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -14,7 +15,29 @@ router = APIRouter(
 
 
 # =========================================================
-# HELPER: CREATE EVENT UPDATE NOTIFICATIONS
+# HELPER: REFRESH EVENT STATUSES
+# =========================================================
+
+def refresh_event_statuses(db: Session, events: list[Event]) -> None:
+    """
+    Recalculate event statuses and commit only if a status changes.
+    Uses the existing event_service implementation.
+    """
+    changed = False
+
+    for event in events:
+        new_status = update_event_status(event)
+
+        if event.event_status != new_status:
+            event.event_status = new_status
+            changed = True
+
+    if changed:
+        db.commit()
+
+
+# =========================================================
+# HELPER: NOTIFY USERS WITH CONFIRMED BOOKINGS
 # =========================================================
 
 def notify_booked_users(
@@ -23,7 +46,7 @@ def notify_booked_users(
     title: str,
     message: str,
     notification_type: str
-):
+) -> None:
     bookings = (
         db.query(Booking)
         .filter(
@@ -36,9 +59,6 @@ def notify_booked_users(
     notified_users = set()
 
     for booking in bookings:
-
-        # Avoid duplicate notifications if the same user
-        # has multiple bookings for the same event.
         if booking.user_id in notified_users:
             continue
 
@@ -99,19 +119,13 @@ def get_all_events(
         .all()
     )
 
-    for event in events:
-        new_status = update_event_status(event)
-
-        if event.event_status != new_status:
-            event.event_status = new_status
-
-    db.commit()
+    refresh_event_statuses(db, events)
 
     return events
 
 
 # =========================================================
-# SEARCH EVENTS
+# SEARCH EVENTS BY TITLE
 # =========================================================
 
 @router.get("/search", response_model=list[EventResponse])
@@ -121,18 +135,12 @@ def search_events(
 ):
     events = (
         db.query(Event)
-        .filter(Event.title.ilike(f"%{title}%"))
+        .filter(Event.title.ilike(f"%{title.strip()}%"))
         .order_by(Event.event_date.asc())
         .all()
     )
 
-    for event in events:
-        new_status = update_event_status(event)
-
-        if event.event_status != new_status:
-            event.event_status = new_status
-
-    db.commit()
+    refresh_event_statuses(db, events)
 
     return events
 
@@ -153,19 +161,13 @@ def get_events_by_category(
         .all()
     )
 
-    for event in events:
-        new_status = update_event_status(event)
-
-        if event.event_status != new_status:
-            event.event_status = new_status
-
-    db.commit()
+    refresh_event_statuses(db, events)
 
     return events
 
 
 # =========================================================
-# GET ORGANIZER'S EVENTS
+# GET CURRENT ORGANIZER'S EVENTS
 # =========================================================
 
 @router.get("/my-events", response_model=list[EventResponse])
@@ -180,13 +182,7 @@ def get_my_events(
         .all()
     )
 
-    for event in events:
-        new_status = update_event_status(event)
-
-        if event.event_status != new_status:
-            event.event_status = new_status
-
-    db.commit()
+    refresh_event_statuses(db, events)
 
     return events
 
@@ -226,37 +222,53 @@ def update_event(
             detail="Cancelled events cannot be updated"
         )
 
-    update_data = event_data.model_dump(
-        exclude_unset=True
-    )
+    update_data = event_data.model_dump(exclude_unset=True)
 
-    for field, value in update_data.items():
+    # Do not allow an update request to transfer ownership
+    # or directly override system-managed event fields.
+    protected_fields = {
+        "organizer_id",
+        "available_tickets",
+        "event_status"
+    }
 
-        if field == "total_tickets":
+    for field in protected_fields:
+        update_data.pop(field, None)
+
+    # Preserve already-sold tickets when total ticket capacity changes.
+    if "total_tickets" in update_data:
+        new_total = update_data["total_tickets"]
+
+        if new_total is not None:
             tickets_sold = (
-                event.total_tickets -
-                event.available_tickets
+                event.total_tickets - event.available_tickets
             )
 
-            if value < tickets_sold:
+            if new_total < tickets_sold:
                 raise HTTPException(
                     status_code=400,
-                    detail="Total tickets cannot be less than tickets already sold"
+                    detail=(
+                        "Total tickets cannot be less than "
+                        "tickets already sold"
+                    )
                 )
 
-            event.available_tickets = value - tickets_sold
+            event.available_tickets = new_total - tickets_sold
 
+    for field, value in update_data.items():
         setattr(event, field, value)
 
-    # Recalculate event status
+    # Recalculate the status using the existing service.
     event.event_status = update_event_status(event)
 
-    # Notify users only if there are confirmed bookings
     notify_booked_users(
         db=db,
         event=event,
         title="Event Updated",
-        message=f'The event "{event.title}" has been updated. Please check the latest event details.',
+        message=(
+            f'The event "{event.title}" has been updated. '
+            "Please check the latest event details."
+        ),
         notification_type="EVENT_UPDATE"
     )
 
@@ -302,7 +314,6 @@ def cancel_event(
 
     event.event_status = "CANCELLED"
 
-    # Notify confirmed ticket holders
     notify_booked_users(
         db=db,
         event=event,
@@ -322,7 +333,7 @@ def cancel_event(
 
 
 # =========================================================
-# GET BOOKINGS FOR ORGANIZER EVENT
+# GET BOOKINGS FOR AN ORGANIZER'S EVENT
 # =========================================================
 
 @router.get("/{event_id}/bookings")
@@ -375,7 +386,7 @@ def get_event_bookings(
 
 
 # =========================================================
-# GET SINGLE EVENT
+# GET A SINGLE EVENT
 # =========================================================
 
 @router.get("/{event_id}", response_model=EventResponse)
@@ -395,11 +406,6 @@ def get_event(
             detail="Event not found"
         )
 
-    new_status = update_event_status(event)
-
-    if event.event_status != new_status:
-        event.event_status = new_status
-        db.commit()
-        db.refresh(event)
+    refresh_event_statuses(db, [event])
 
     return event

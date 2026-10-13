@@ -1,0 +1,41 @@
+[
+  {
+    "id": 3,
+    "booking_id": 15,
+    "payment_method": "SIMULATED",
+    "payment_status": "SUCCESS",
+    "transaction_id": "SIM-BA1279E2B0674A6BB6AAAF42E30F4512",
+    "amount": 400,
+    "created_at": "2026-10-12T12:18:26",
+    "refund_status": "REFUNDED",
+    "refund_amount": 400,
+    "refund_transaction_id": "SIM-REFUND-7AC4CB28A0E04EAB",
+    "refunded_at": "2026-10-12T16:16:25.562606"
+  },
+  {
+    "id": 2,
+    "booking_id": 14,
+    "payment_method": "SIMULATED",
+    "payment_status": "SUCCESS",
+    "transaction_id": "SIM-DA425878538E411C87DD244299E13119",
+    "amount": 500,
+    "created_at": "2026-10-12T06:34:06",
+    "refund_status": "NONE",
+    "refund_amount": 0,
+    "refund_transaction_id": null,
+    "refunded_at": null
+  },
+  {
+    "id": 1,
+    "booking_id": 13,
+    "payment_method": "SIMULATED",
+    "payment_status": "SUCCESS",
+    "transaction_id": "SIM-641B04639BC240BAB3DCDBC427FADF3E",
+    "amount": 500,
+    "created_at": "2026-10-12T06:19:39",
+    "refund_status": "NONE",
+    "refund_amount": 0,
+    "refund_transaction_id": null,
+    "refunded_at": null
+  }
+]

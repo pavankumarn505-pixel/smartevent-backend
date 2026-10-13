@@ -1,3 +1,4 @@
+
 from sqlalchemy import (
     Column,
     Integer,
@@ -6,9 +7,8 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
-    Boolean
+    Boolean,
 )
-
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -20,65 +20,35 @@ from .database import Base
 # =========================================================
 
 class User(Base):
-
     __tablename__ = "users"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True
-    )
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(100), unique=True, nullable=False)
+    email = Column(String(255), unique=True, nullable=False)
+    hashed_password = Column(String(255), nullable=False)
 
-    username = Column(
-        String(100),
-        unique=True,
-        nullable=False
-    )
-
-    email = Column(
-        String(255),
-        unique=True,
-        nullable=False
-    )
-
-    hashed_password = Column(
-        String(255),
-        nullable=False
-    )
-
-    # =====================================================
-    # ROLE
-    # USER / ORGANIZER / ADMIN
-    # =====================================================
-
-    role = Column(
-        String(20),
-        nullable=False,
-        default="USER"
-    )
+    role = Column(String(20), nullable=False, default="USER")
 
     created_at = Column(
         DateTime(timezone=True),
-        server_default=func.now()
+        server_default=func.now(),
     )
-
-    # Relationships
 
     bookings = relationship(
         "Booking",
         back_populates="user",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
     )
 
     notifications = relationship(
         "Notification",
         back_populates="user",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
     )
 
     organized_events = relationship(
         "Event",
-        back_populates="organizer"
+        back_populates="organizer",
     )
 
 
@@ -87,97 +57,45 @@ class User(Base):
 # =========================================================
 
 class Event(Base):
-
     __tablename__ = "events"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True
-    )
-
-    title = Column(
-        String(200),
-        nullable=False
-    )
-
-    description = Column(
-        Text,
-        nullable=True
-    )
-
-    category = Column(
-        String(50),
-        nullable=False
-    )
-
-    location = Column(
-        String(255),
-        nullable=False
-    )
-
-    event_date = Column(
-        DateTime,
-        nullable=False
-    )
-
-    ticket_price = Column(
-        Float,
-        nullable=False
-    )
-
-    banner_image = Column(
-        String(500),
-        nullable=True
-    )
-
-    total_tickets = Column(
-        Integer,
-        nullable=False
-    )
-
-    available_tickets = Column(
-        Integer,
-        nullable=False
-    )
-
-    # =====================================================
-    # ORGANIZER
-    # =====================================================
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    category = Column(String(50), nullable=False)
+    location = Column(String(255), nullable=False)
+    event_date = Column(DateTime, nullable=False)
+    ticket_price = Column(Float, nullable=False)
+    banner_image = Column(String(500), nullable=True)
+    total_tickets = Column(Integer, nullable=False)
+    available_tickets = Column(Integer, nullable=False)
 
     organizer_id = Column(
         Integer,
         ForeignKey("users.id"),
-        nullable=True
+        nullable=True,
     )
-
-    # =====================================================
-    # EVENT STATUS
-    # UPCOMING / ONGOING / COMPLETED / CANCELLED
-    # =====================================================
 
     event_status = Column(
         String(20),
         nullable=False,
-        default="UPCOMING"
+        default="UPCOMING",
     )
 
     created_at = Column(
         DateTime(timezone=True),
-        server_default=func.now()
+        server_default=func.now(),
     )
-
-    # Relationships
 
     bookings = relationship(
         "Booking",
         back_populates="event",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
     )
 
     organizer = relationship(
         "User",
-        back_populates="organized_events"
+        back_populates="organized_events",
     )
 
 
@@ -186,64 +104,72 @@ class Event(Base):
 # =========================================================
 
 class Booking(Base):
-
     __tablename__ = "bookings"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True
-    )
+    id = Column(Integer, primary_key=True, index=True)
 
     user_id = Column(
         Integer,
         ForeignKey("users.id"),
-        nullable=False
+        nullable=False,
     )
 
     event_id = Column(
         Integer,
         ForeignKey("events.id"),
-        nullable=False
+        nullable=False,
     )
 
-    ticket_quantity = Column(
+    ticket_quantity = Column(Integer, nullable=False)
+    total_price = Column(Float, nullable=False)
+
+    # Module 13: Coupon and discount fields
+    coupon_id = Column(
         Integer,
-        nullable=False
+        ForeignKey("coupons.id"),
+        nullable=True,
     )
 
-    total_price = Column(
+    discount_amount = Column(
         Float,
-        nullable=False
+        nullable=False,
+        default=0.0,
+        server_default="0",
+    )
+
+    final_amount = Column(
+        Float,
+        nullable=True,
     )
 
     booking_status = Column(
         String(20),
         nullable=False,
-        default="PENDING"
+        default="PENDING",
     )
 
     created_at = Column(
         DateTime(timezone=True),
-        server_default=func.now()
+        server_default=func.now(),
     )
 
-    user = relationship(
-        "User",
-        back_populates="bookings"
-    )
-
-    event = relationship(
-        "Event",
-        back_populates="bookings"
-    )
+    user = relationship("User", back_populates="bookings")
+    event = relationship("Event", back_populates="bookings")
 
     ticket = relationship(
         "Ticket",
         back_populates="booking",
         uselist=False,
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
     )
+
+    payments = relationship(
+        "Payment",
+        back_populates="booking",
+        cascade="all, delete-orphan",
+    )
+
+    coupon = relationship("Coupon")
 
 
 # =========================================================
@@ -251,42 +177,31 @@ class Booking(Base):
 # =========================================================
 
 class Ticket(Base):
-
     __tablename__ = "tickets"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True
-    )
+    id = Column(Integer, primary_key=True, index=True)
 
     booking_id = Column(
         Integer,
         ForeignKey("bookings.id"),
         unique=True,
-        nullable=False
+        nullable=False,
     )
 
     ticket_code = Column(
         String(100),
         unique=True,
-        nullable=False
+        nullable=False,
     )
 
-    qr_code_url = Column(
-        String(500),
-        nullable=True
-    )
+    qr_code_url = Column(String(500), nullable=True)
 
     created_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now()
+        DateTime,
+        server_default=func.now(),
     )
 
-    booking = relationship(
-        "Booking",
-        back_populates="ticket"
-    )
+    booking = relationship("Booking", back_populates="ticket")
 
 
 # =========================================================
@@ -294,48 +209,148 @@ class Ticket(Base):
 # =========================================================
 
 class Notification(Base):
-
     __tablename__ = "notifications"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True
-    )
+    id = Column(Integer, primary_key=True, index=True)
 
     user_id = Column(
         Integer,
         ForeignKey("users.id"),
-        nullable=False
+        nullable=False,
     )
 
-    title = Column(
-        String(255),
-        nullable=False
-    )
-
-    message = Column(
-        Text,
-        nullable=False
-    )
-
-    type = Column(
-        String(20),
-        nullable=False
-    )
+    title = Column(String(255), nullable=False)
+    message = Column(Text, nullable=False)
+    type = Column(String(50), nullable=False)
 
     is_read = Column(
         Boolean,
         nullable=False,
-        default=False
+        default=False,
     )
 
     created_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now()
+        DateTime,
+        server_default=func.now(),
     )
 
-    user = relationship(
-        "User",
-        back_populates="notifications"
+    user = relationship("User", back_populates="notifications")
+
+
+# =========================================================
+# PAYMENT MODEL - MODULE 14 REFUND TRACKING
+# =========================================================
+
+class Payment(Base):
+    __tablename__ = "payments"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    booking_id = Column(
+        Integer,
+        ForeignKey("bookings.id"),
+        nullable=False,
+        index=True,
+    )
+
+    payment_method = Column(
+        String(50),
+        nullable=False,
+        default="SIMULATED",
+    )
+
+    payment_status = Column(
+        String(20),
+        nullable=False,
+        default="PENDING",
+    )
+
+    transaction_id = Column(
+        String(255),
+        nullable=True,
+        unique=True,
+    )
+
+    amount = Column(Float, nullable=False)
+
+    created_at = Column(
+        DateTime,
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    # Module 14: Simulated refund tracking
+    refund_status = Column(
+        String(20),
+        nullable=False,
+        default="NONE",
+        server_default="NONE",
+    )
+
+    refund_amount = Column(
+        Float,
+        nullable=False,
+        default=0.0,
+        server_default="0",
+    )
+
+    refund_transaction_id = Column(
+        String(255),
+        nullable=True,
+        unique=True,
+    )
+
+    refunded_at = Column(
+        DateTime,
+        nullable=True,
+    )
+
+    booking = relationship("Booking", back_populates="payments")
+
+
+# =========================================================
+# COUPON MODEL - MODULE 13
+# =========================================================
+
+class Coupon(Base):
+    __tablename__ = "coupons"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    coupon_code = Column(
+        String(50),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
+
+    # Supported types: PERCENTAGE or FIXED
+    discount_type = Column(String(20), nullable=False)
+    discount_value = Column(Float, nullable=False)
+
+    minimum_booking_amount = Column(
+        Float,
+        nullable=False,
+        default=0,
+    )
+
+    expiry_date = Column(DateTime, nullable=False)
+    usage_limit = Column(Integer, nullable=False)
+
+    used_count = Column(
+        Integer,
+        nullable=False,
+        default=0,
+    )
+
+    is_active = Column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    created_at = Column(
+        DateTime,
+        server_default=func.now(),
+        nullable=False,
     )

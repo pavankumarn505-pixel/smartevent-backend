@@ -1,0 +1,9 @@
+{
+  "coupon_code": "SAVE20",
+  "discount_type": "PERCENTAGE",
+  "discount_value": 20,
+  "booking_amount": 500,
+  "discount_amount": 100,
+  "final_amount": 400,
+  "message": "Coupon applied successfully"
+}
