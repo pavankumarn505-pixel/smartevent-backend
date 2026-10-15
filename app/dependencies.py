@@ -7,6 +7,7 @@ from .models import User
 from .auth import decode_access_token
 
 
+
 # OAuth2 configuration
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="/auth/token"

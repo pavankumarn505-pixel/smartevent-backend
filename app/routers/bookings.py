@@ -2,8 +2,8 @@
 from datetime import datetime, timezone
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import update
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from sqlalchemy import case, update
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -22,6 +22,8 @@ from ..services.qr_service import (
     generate_ticket_code,
     generate_qr_code,
 )
+from ..services.availability_manager import availability_manager
+
 
 router = APIRouter(
     prefix="/bookings",
@@ -31,6 +33,14 @@ router = APIRouter(
 
 def get_current_time():
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+async def broadcast_availability(event_id: int, available_tickets: int):
+    """Broadcast the committed ticket count to connected WebSocket clients."""
+    await availability_manager.broadcast_availability(
+        event_id,
+        available_tickets,
+    )
 
 
 def check_coupon(coupon: Coupon, booking_amount: float):
@@ -83,25 +93,34 @@ def check_coupon(coupon: Coupon, booking_amount: float):
 
 
 # =========================================================
-# CREATE BOOKING
+# CREATE BOOKING - ATOMIC TICKET RESERVATION
 # =========================================================
 
 @router.post("/", response_model=BookingResponse, status_code=201)
 def create_booking(
     booking_data: BookingCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     try:
+        if booking_data.ticket_quantity <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Ticket quantity must be greater than 0",
+            )
+
         event = (
             db.query(Event)
             .filter(Event.id == booking_data.event_id)
-            .with_for_update()
             .first()
         )
 
         if event is None:
-            raise HTTPException(status_code=404, detail="Event not found")
+            raise HTTPException(
+                status_code=404,
+                detail="Event not found",
+            )
 
         if event.event_status != "ACTIVE":
             raise HTTPException(
@@ -109,22 +128,54 @@ def create_booking(
                 detail="This event is not available for booking",
             )
 
-        if booking_data.ticket_quantity <= 0:
-            raise HTTPException(
-                status_code=400,
-                detail="Ticket quantity must be greater than 0",
+        event_id = event.id
+        ticket_quantity = booking_data.ticket_quantity
+        event_title = event.title
+        ticket_price = float(event.ticket_price)
+
+        # Atomically reserve tickets only if the event is active
+        # and enough tickets remain.
+        reservation = db.execute(
+            update(Event)
+            .where(
+                Event.id == event_id,
+                Event.event_status == "ACTIVE",
+                Event.available_tickets >= ticket_quantity,
+            )
+            .values(
+                available_tickets=(
+                    Event.available_tickets - ticket_quantity
+                )
+            )
+            .execution_options(synchronize_session=False)
+        )
+
+        if reservation.rowcount != 1:
+            # Preserve the exact error expected by existing tests.
+            current_event = (
+                db.query(Event)
+                .filter(Event.id == event_id)
+                .first()
             )
 
-        if booking_data.ticket_quantity > event.available_tickets:
+            if current_event is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Event not found",
+                )
+
+            if current_event.event_status != "ACTIVE":
+                raise HTTPException(
+                    status_code=400,
+                    detail="This event is not available for booking",
+                )
+
             raise HTTPException(
                 status_code=400,
                 detail="Not enough tickets available",
             )
 
-        total_price = round(
-            float(event.ticket_price) * booking_data.ticket_quantity,
-            2,
-        )
+        total_price = round(ticket_price * ticket_quantity, 2)
 
         coupon = None
         discount_amount = 0.0
@@ -136,7 +187,6 @@ def create_booking(
             coupon = (
                 db.query(Coupon)
                 .filter(Coupon.coupon_code == code)
-                .with_for_update()
                 .first()
             )
 
@@ -151,7 +201,8 @@ def create_booking(
                 total_price,
             )
 
-            result = db.execute(
+            # Atomically reserve one coupon use.
+            coupon_result = db.execute(
                 update(Coupon)
                 .where(
                     Coupon.id == coupon.id,
@@ -160,9 +211,10 @@ def create_booking(
                     Coupon.expiry_date > get_current_time(),
                 )
                 .values(used_count=Coupon.used_count + 1)
+                .execution_options(synchronize_session=False)
             )
 
-            if result.rowcount != 1:
+            if coupon_result.rowcount != 1:
                 raise HTTPException(
                     status_code=400,
                     detail="Coupon is no longer available",
@@ -170,16 +222,14 @@ def create_booking(
 
         new_booking = Booking(
             user_id=current_user.id,
-            event_id=event.id,
-            ticket_quantity=booking_data.ticket_quantity,
+            event_id=event_id,
+            ticket_quantity=ticket_quantity,
             total_price=total_price,
             coupon_id=coupon.id if coupon else None,
             discount_amount=discount_amount,
             final_amount=final_amount,
             booking_status="PENDING",
         )
-
-        event.available_tickets -= booking_data.ticket_quantity
 
         db.add(new_booking)
         db.flush()
@@ -198,8 +248,8 @@ def create_booking(
             user_id=current_user.id,
             title="Booking Created",
             message=(
-                f"Your booking for '{event.title}' has been created. "
-                f"Tickets: {booking_data.ticket_quantity}. "
+                f"Your booking for '{event_title}' has been created. "
+                f"Tickets: {ticket_quantity}. "
                 f"Original amount: {total_price:.2f}. "
                 f"Discount: {discount_amount:.2f}. "
                 f"Amount payable: {final_amount:.2f}. "
@@ -210,14 +260,30 @@ def create_booking(
         )
         db.add(notification)
 
+        # Commit inventory and related booking records together.
         db.commit()
         db.refresh(new_booking)
+
+        # Query the committed value rather than using a stale ORM object.
+        available_tickets = (
+            db.query(Event.available_tickets)
+            .filter(Event.id == event_id)
+            .scalar()
+        )
+
+        if available_tickets is not None:
+            background_tasks.add_task(
+                broadcast_availability,
+                event_id,
+                available_tickets,
+            )
 
         return new_booking
 
     except HTTPException:
         db.rollback()
         raise
+
     except Exception:
         db.rollback()
         raise HTTPException(
@@ -250,6 +316,7 @@ def get_my_bookings(
 @router.post("/{booking_id}/cancel", response_model=BookingResponse)
 def cancel_booking(
     booking_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -282,10 +349,12 @@ def cancel_booking(
                 detail="This booking cannot be cancelled",
             )
 
+        event_id = booking.event_id
+        quantity_to_restore = booking.ticket_quantity
+
         event = (
             db.query(Event)
-            .filter(Event.id == booking.event_id)
-            .with_for_update()
+            .filter(Event.id == event_id)
             .first()
         )
 
@@ -295,18 +364,15 @@ def cancel_booking(
                 detail="Associated event not found",
             )
 
-        # Only one successful payment is expected per booking.
         successful_payments = (
             db.query(Payment)
             .filter(
                 Payment.booking_id == booking.id,
                 Payment.payment_status == "SUCCESS",
             )
-            .with_for_update()
             .all()
         )
 
-        # Avoid silently recording a refund larger than the booking charge.
         if len(successful_payments) > 1:
             raise HTTPException(
                 status_code=409,
@@ -335,25 +401,39 @@ def cancel_booking(
             )
             payment.refunded_at = get_current_time()
 
-        # Restore reserved tickets without exceeding event capacity.
-        event.available_tickets = min(
-            event.total_tickets,
-            event.available_tickets + booking.ticket_quantity,
+        # Restore inventory atomically and cap it at total capacity.
+        restore_result = db.execute(
+            update(Event)
+            .where(Event.id == event_id)
+            .values(
+                available_tickets=case(
+                    (
+                        Event.available_tickets + quantity_to_restore
+                        <= Event.total_tickets,
+                        Event.available_tickets + quantity_to_restore,
+                    ),
+                    else_=Event.total_tickets,
+                )
+            )
+            .execution_options(synchronize_session=False)
         )
 
-        # Release the coupon use for this cancelled booking.
+        if restore_result.rowcount != 1:
+            raise HTTPException(
+                status_code=409,
+                detail="Could not restore tickets for this event",
+            )
+
         if booking.coupon_id is not None:
             coupon = (
                 db.query(Coupon)
                 .filter(Coupon.id == booking.coupon_id)
-                .with_for_update()
                 .first()
             )
 
             if coupon is not None:
                 coupon.used_count = max(0, coupon.used_count - 1)
 
-        # Remove the booking's ticket and its QR ticket record.
         ticket = (
             db.query(Ticket)
             .filter(Ticket.booking_id == booking.id)
@@ -387,11 +467,25 @@ def cancel_booking(
         db.commit()
         db.refresh(booking)
 
+        available_tickets = (
+            db.query(Event.available_tickets)
+            .filter(Event.id == event_id)
+            .scalar()
+        )
+
+        if available_tickets is not None:
+            background_tasks.add_task(
+                broadcast_availability,
+                event_id,
+                available_tickets,
+            )
+
         return booking
 
     except HTTPException:
         db.rollback()
         raise
+
     except Exception:
         db.rollback()
         raise HTTPException(

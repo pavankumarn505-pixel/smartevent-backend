@@ -1,8 +1,12 @@
-
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import (
+    BaseModel,
+    EmailStr,
+    Field,
+    ConfigDict,
+)
 
 
 # =========================================================
@@ -36,6 +40,66 @@ class Token(BaseModel):
 
 
 # =========================================================
+# USER PROFILE SCHEMAS - MODULE 22
+# =========================================================
+
+class UserProfileUpdate(BaseModel):
+    """
+    Fields a logged-in user can update in their profile.
+    All fields are optional so users can update individual fields.
+    """
+
+    username: str | None = Field(
+        default=None,
+        min_length=3,
+        max_length=50,
+    )
+
+    email: EmailStr | None = None
+
+    full_name: str | None = Field(
+        default=None,
+        max_length=150,
+    )
+
+    phone: str | None = Field(
+        default=None,
+        max_length=20,
+    )
+
+
+class UserProfileResponse(BaseModel):
+    id: int
+    username: str
+    email: EmailStr
+    role: str
+    full_name: str | None = None
+    phone: str | None = None
+    profile_picture: str | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProfilePictureResponse(BaseModel):
+    message: str
+    profile_picture: str
+
+
+class BookingSummaryResponse(BaseModel):
+    """
+    Summary of bookings belonging to the logged-in user.
+    """
+
+    total_bookings: int = 0
+    confirmed_bookings: int = 0
+    pending_bookings: int = 0
+    cancelled_bookings: int = 0
+    total_tickets: int = 0
+    total_spent: float = 0.0
+
+
+# =========================================================
 # EVENT SCHEMAS
 # =========================================================
 
@@ -53,16 +117,31 @@ class EventCreate(BaseModel):
 
 
 class EventUpdate(BaseModel):
-    title: str | None = Field(None, min_length=3, max_length=200)
+    title: str | None = Field(
+        default=None,
+        min_length=3,
+        max_length=200,
+    )
+
     description: str | None = None
 
-    category: Literal["Music", "Tech", "Sports", "Business"] | None = None
+    category: Literal[
+        "Music",
+        "Tech",
+        "Sports",
+        "Business",
+    ] | None = None
 
-    location: str | None = Field(None, min_length=2, max_length=255)
+    location: str | None = Field(
+        default=None,
+        min_length=2,
+        max_length=255,
+    )
+
     event_date: datetime | None = None
-    ticket_price: float | None = Field(None, ge=0)
+    ticket_price: float | None = Field(default=None, ge=0)
     banner_image: str | None = None
-    total_tickets: int | None = Field(None, gt=0)
+    total_tickets: int | None = Field(default=None, gt=0)
 
 
 class EventResponse(BaseModel):
@@ -90,10 +169,11 @@ class EventResponse(BaseModel):
 class BookingCreate(BaseModel):
     event_id: int = Field(..., gt=0)
     ticket_quantity: int = Field(..., gt=0)
+
     coupon_code: str | None = Field(
         default=None,
         min_length=1,
-        max_length=50
+        max_length=50,
     )
 
 
@@ -187,7 +267,7 @@ class CouponCreate(BaseModel):
     coupon_code: str = Field(
         ...,
         min_length=3,
-        max_length=50
+        max_length=50,
     )
 
     discount_type: Literal["PERCENTAGE", "FIXED"]
@@ -195,7 +275,7 @@ class CouponCreate(BaseModel):
 
     minimum_booking_amount: float = Field(
         default=0,
-        ge=0
+        ge=0,
     )
 
     expiry_date: datetime
@@ -221,7 +301,7 @@ class CouponValidateRequest(BaseModel):
     coupon_code: str = Field(
         ...,
         min_length=1,
-        max_length=50
+        max_length=50,
     )
 
     booking_amount: float = Field(..., gt=0)

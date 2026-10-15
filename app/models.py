@@ -8,6 +8,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Boolean,
+    UniqueConstraint,
 )
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -16,7 +17,7 @@ from .database import Base
 
 
 # =========================================================
-# USER MODEL
+# USER MODEL - MODULE 22 PROFILE ENHANCEMENTS
 # =========================================================
 
 class User(Base):
@@ -28,6 +29,11 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
 
     role = Column(String(20), nullable=False, default="USER")
+
+    # Module 22: User profile fields
+    full_name = Column(String(150), nullable=True)
+    phone = Column(String(20), nullable=True)
+    profile_picture = Column(String(500), nullable=True)
 
     created_at = Column(
         DateTime(timezone=True),
@@ -49,6 +55,12 @@ class User(Base):
     organized_events = relationship(
         "Event",
         back_populates="organizer",
+    )
+
+    wishlists = relationship(
+        "Wishlist",
+        back_populates="user",
+        cascade="all, delete-orphan",
     )
 
 
@@ -98,6 +110,12 @@ class Event(Base):
         back_populates="organized_events",
     )
 
+    wishlists = relationship(
+        "Wishlist",
+        back_populates="event",
+        cascade="all, delete-orphan",
+    )
+
 
 # =========================================================
 # BOOKING MODEL
@@ -123,7 +141,6 @@ class Booking(Base):
     ticket_quantity = Column(Integer, nullable=False)
     total_price = Column(Float, nullable=False)
 
-    # Module 13: Coupon and discount fields
     coupon_id = Column(
         Integer,
         ForeignKey("coupons.id"),
@@ -238,7 +255,7 @@ class Notification(Base):
 
 
 # =========================================================
-# PAYMENT MODEL - MODULE 14 REFUND TRACKING
+# PAYMENT MODEL
 # =========================================================
 
 class Payment(Base):
@@ -279,7 +296,6 @@ class Payment(Base):
         nullable=False,
     )
 
-    # Module 14: Simulated refund tracking
     refund_status = Column(
         String(20),
         nullable=False,
@@ -309,7 +325,7 @@ class Payment(Base):
 
 
 # =========================================================
-# COUPON MODEL - MODULE 13
+# COUPON MODEL
 # =========================================================
 
 class Coupon(Base):
@@ -324,7 +340,6 @@ class Coupon(Base):
         index=True,
     )
 
-    # Supported types: PERCENTAGE or FIXED
     discount_type = Column(String(20), nullable=False)
     discount_value = Column(Float, nullable=False)
 
@@ -354,3 +369,100 @@ class Coupon(Base):
         server_default=func.now(),
         nullable=False,
     )
+
+
+# =========================================================
+# WISHLIST MODEL - MODULE 20
+# =========================================================
+
+class Wishlist(Base):
+    __tablename__ = "wishlists"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False,
+        index=True,
+    )
+
+    event_id = Column(
+        Integer,
+        ForeignKey("events.id"),
+        nullable=False,
+        index=True,
+    )
+
+    created_at = Column(
+        DateTime,
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "event_id",
+            name="uq_wishlist_user_event",
+        ),
+    )
+
+    user = relationship(
+        "User",
+        back_populates="wishlists",
+    )
+
+    event = relationship(
+        "Event",
+        back_populates="wishlists",
+    )
+
+
+# =========================================================
+# AUDIT LOG MODEL - MODULE 21
+# =========================================================
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=True,
+        index=True,
+    )
+
+    action = Column(
+        String(100),
+        nullable=False,
+        index=True,
+    )
+
+    description = Column(Text, nullable=False)
+
+    resource_type = Column(
+        String(100),
+        nullable=True,
+    )
+
+    resource_id = Column(
+        Integer,
+        nullable=True,
+    )
+
+    ip_address = Column(
+        String(45),
+        nullable=True,
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True,
+    )
+
+    user = relationship("User")

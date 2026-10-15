@@ -1,4 +1,3 @@
-
 from datetime import datetime, timezone
 
 from ..models import Event
@@ -19,8 +18,15 @@ def update_event_status(event: Event) -> str:
     if event.event_status == "CANCELLED":
         return "CANCELLED"
 
-    now = datetime.now(timezone.utc)
+    # Get the event date.
     event_date = event.event_date
+
+    # Handle missing event dates safely.
+    if event_date is None:
+        raise ValueError("Event date cannot be None.")
+
+    # Get the current UTC time.
+    now = datetime.now(timezone.utc)
 
     # SQLite may return a datetime without timezone information.
     if event_date.tzinfo is None:
@@ -32,10 +38,13 @@ def update_event_status(event: Event) -> str:
     today = now.date()
     scheduled_date = event_date.date()
 
+    # Future event.
     if scheduled_date > today:
         return "UPCOMING"
 
+    # Event scheduled for today.
     if scheduled_date == today:
         return "ONGOING"
 
+    # Event date has passed.
     return "COMPLETED"
